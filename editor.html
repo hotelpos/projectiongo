@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ProjectionGo — Editor</title>
+  <style>
+    body { font-family: Arial; display:flex; height:100vh; margin:0; }
+    #sidebar { width:30%; padding:20px; background:#f5f5f5; box-shadow:2px 0 5px rgba(0,0,0,0.1); overflow-y:auto; }
+    #main { flex:1; padding:20px; }
+    button { margin:4px; padding:8px 12px; }
+    .cue { border-bottom:1px solid #ccc; padding:8px; margin-bottom:4px; }
+  </style>
+</head>
+<body>
+  <div id="sidebar">
+    <h2>Shows</h2>
+    <ul id="shows"></ul>
+    <button onclick="newShow()">+ New Show</button>
+  </div>
+  <div id="main">
+    <h2 id="showTitle">—</h2>
+    <input id="titleInput" placeholder="Show Title" style="width:90%;" /><br><br>
+    <button onclick="addCue('video')">Add Video</button>
+    <button onclick="addCue('image')">Add PNG Image</button>
+    <button onclick="addCue('blackout')">Add Blackout</button>
+    <div id="cueList"></div>
+    <button onclick="saveShow()">💾 Save Show</button>
+    <button onclick="location.href='index.html'">← Home</button>
+  </div>
+
+  <script>
+    let shows = JSON.parse(localStorage.getItem('pg_shows')||'[]');
+    let current = null;
+    function refresh() {
+      document.getElementById('shows').innerHTML = '';
+      shows.forEach((s,i)=> {
+        const li = document.createElement('li');
+        li.textContent = s.title;
+        li.style.cursor='pointer';
+        li.onclick = ()=>editShow(i);
+        document.getElementById('shows').append(li);
+      });
+    }
+    function newShow(){
+      const s = { title:'Untitled', cues: [] };
+      shows.push(s);
+      current = shows.length-1;
+      editShow(current);
+    }
+    function editShow(i){
+      current = i;
+      const s=shows[i];
+      document.getElementById('showTitle').textContent = s.title;
+      document.getElementById('titleInput').value = s.title;
+      renderCues();
+    }
+    function renderCues(){
+      let s=shows[current];
+      const div = document.getElementById('cueList'); div.innerHTML='';
+      s.cues.forEach((c,i)=>{
+        const cueDiv = document.createElement('div');
+        cueDiv.className='cue';
+        cueDiv.innerHTML = `
+          <strong>${i+1}. [${c.type.toUpperCase()}] ${c.label||'(no label)'}</strong>
+          <br>Comment: <input value="${c.comment||''}" onchange="updateCue(${i},'comment',this.value)">
+          <br>Transition: <select onchange="updateCue(${i},'transition',this.value)">
+             <option>Fade</option><option>Zoom</option><option>Slide</option><option>Push</option><option>Wipe</option>
+          </select>
+          Duration: <input type="number" min="1" max="10" value="${c.duration||2}" onchange="updateCue(${i},'duration',this.value)">
+          <br><button onclick="rmCue(${i})">🗑 Remove</button>
+        `;
+        cueDiv.querySelector('select').value = c.transition;
+        div.append(cueDiv);
+      });
+    }
+    function addCue(type){
+      if (current===null) return alert('Select or create a show first');
+      if (type!=='blackout'){
+        const input = document.createElement('input'); input.type='file';
+        input.accept = (type==='video'?'.mp4,.mov,.avi,.webm':'.png');
+        input.onchange = ()=> {
+          const f=input.files[0];
+          const url = URL.createObjectURL(f);
+          shows[current].cues.push({type, file:url, label:f.name, comment:'', transition:'Fade', duration:2});
+          renderCues();
+        };
+        input.click();
+      } else {
+        shows[current].cues.push({type, file:null, label:'Blackout', comment:'', transition:'Fade', duration:2});
+        renderCues();
+      }
+    }
+    function updateCue(i,prop,val){
+      const s=shows[current].cues[i];
+      s[prop] = (prop==='duration'? Number(val): val);
+      renderCues();
+    }
+    function rmCue(i){ shows[current].cues.splice(i,1); renderCues(); }
+    function saveShow(){
+      shows[current].title = document.getElementById('titleInput').value;
+      localStorage.setItem('pg_shows', JSON.stringify(shows));
+      refresh();
+      alert('Saved!');
+    }
+    window.onload = refresh;
+  </script>
+</body>
+</html>
