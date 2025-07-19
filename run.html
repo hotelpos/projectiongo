@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>ProjectionGo — Run Show</title>
+  <style>
+    body { font-family: Arial; padding:20px; text-align:center; }
+    .cue-preview { display:inline-block; width:200px;height:120px; margin:8px; background:#eee; }
+    .btn { padding:12px 20px; margin:8px; font-size:18px; }
+  </style>
+</head>
+<body>
+  <h1>🎭 Run Show</h1>
+  <select id="showSel"></select>
+  <button onclick="start()">▶️ Start</button>
+  <button onclick="location.href='index.html'">← Home</button>
+  <div id="controls" style="display:none">
+    <div>Current:</div><div id="curPrev" class="cue-preview"></div>
+    <div>Next:</div><div id="nextPrev" class="cue-preview"></div>
+    <br>
+    <button class="btn" onclick="prevCue()">⬅️ BACK</button>
+    <button class="btn" onclick="nextCue()">➡️ NEXT</button>
+    <button class="btn" onclick="blackout()">⚫ BLACKOUT</button>
+  </div>
+  <script>
+    let shows = JSON.parse(localStorage.getItem('pg_shows')||'[]');
+    const sel=document.getElementById('showSel');
+    shows.forEach((s,i)=> sel.options.add(new Option(s.title,i)));
+    let cues=[], idx=0, popup;
+
+    function start(){
+      if (sel.value==='') return;
+      cues = shows[sel.value].cues;
+      idx=0;
+      popup = window.open('', 'Projection', 'width=800,height=450');
+      popup.document.body.style.margin='0';
+      nextCue();
+      document.getElementById('controls').style.display='block';
+    }
+
+    function loadPreview(el, cue){
+      el.innerHTML='';
+      if (!cue) return;
+      if (cue.type==='blackout') el.style.background='#000';
+      if (cue.type==='image'){
+        const img = new Image(); img.src=cue.file; img.style.maxWidth='100%'; img.style.maxHeight='100%';
+        el.append(img);
+      }
+      if (cue.type==='video'){
+        const v=new Video(); v.src=cue.file; v.loop=true; v.muted=true; v.autoplay=true; v.style.maxWidth='100%'; v.style.maxHeight='100%';
+        el.append(v);
+      }
+    }
+
+    function applyCue(cue, targetDoc){
+      if (!cue) return;
+      targetDoc.open();
+      let html = `<style>body{margin:0;background:#000}</style>`;
+      html += `<div style="width:100%;height:100%;overflow:hidden;position:relative">`;
+      if (cue.type==='blackout'){
+        html+=`<div style="width:100%;height:100%;background:#000;transition:opacity ${cue.duration}s;opacity:0"></div>`;
+        setTimeout(()=>targetDoc.body.firstChild.style.opacity=1,10);
+      }
+      if (cue.type==='image'){
+        html+=`<img src="${cue.file}" style="width:100%;height:100%;object-fit:contain;transition:${cue.transition==='Fade'?'opacity':cue.transition==='Zoom'?'transform':'opacity'} ${cue.duration}s;opacity:0;transform:scale(${cue.transition==='Zoom'?0.5:1});">`;
+      }
+      if (cue.type==='video'){
+        html+=`<video src="${cue.file}" autoplay loop muted style="width:100%;height:100%;object-fit:contain;transition:${cue.transition==='Fade'?'opacity':cue.transition==='Zoom'?'transform':'opacity'} ${cue.duration}s;opacity:0;transform:scale(${cue.transition==='Zoom'?0.5:1});"></video>`;
+      }
+      html+=`</div>`;
+      html+=`<script>const el=document.querySelector('img,video,div'); setTimeout(()=>{el.style.opacity=1; el.style.transform='scale(1)';},50);</script>`;
+      targetDoc.write(html);
+      targetDoc.close();
+    }
+
+    function nextCue(){ idx=Math.min(idx+1,cues.length-1); renderRun(); }
+    function prevCue(){ idx=Math.max(idx-1,0); renderRun(); }
+    function blackout(){
+      const b={type:'blackout', file:null, transition:'Fade', duration:2};
+      applyCue(b, popup.document);
+    }
+
+    function renderRun(){
+      const cur=cues[idx], nxt=cues[idx+1];
+      loadPreview(document.getElementById('curPrev'),cur);
+      loadPreview(document.getElementById('nextPrev'),nxt);
+      applyCue(cur, popup.document);
+    }
+
+    document.addEventListener('keydown', e=>{
+      if(document.getElementById('controls').style.display!=='block') return;
+      if (e.key===' ') nextCue();
+      if (e.key==='ArrowLeft') prevCue();
+      if (e.key==='b' || e.key==='B') blackout();
+    });
+  </script>
+</body>
+</html>
